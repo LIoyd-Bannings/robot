@@ -136,6 +136,66 @@ docker build -t robot-amr -f docker/Dockerfile .
 docker run -it --rm robot-amr bash      # 进入后已编译好，source install/setup.bash 即可
 ```
 
+## 在无界面服务器上显示图形界面（VNC）
+
+项目在没有显示器的服务器上运行，Gazebo / RViz 等图形界面通过 **VNC 虚拟桌面 + SSH 端口转发** 投送到本地主机查看（本地用 VNC Viewer，如 `vncviewer64-1.16.2`）。原理是：服务器上 TigerVNC 起一个虚拟桌面并提供 `DISPLAY`，所有 GUI 渲染到该桌面；本机经 SSH 隧道连接 VNC 端口实时显示。
+
+### 1. 服务器端：启动 VNC 虚拟桌面（首次）
+
+```bash
+# 首次设置 VNC 密码（仅第一次）
+vncpasswd
+
+# 在 display :1 启动虚拟桌面（端口 5901，仅监听 127.0.0.1，需经 SSH 转发访问）
+vncserver :1 -geometry 1920x1080 -depth 24 -localhost yes
+
+# 查看 / 复用已有会话
+vncserver -list
+```
+
+> display 号与端口对应关系：`:1` → `5901`，`:2` → `5902`，依此类推（`5900 + N`）。
+> 若桌面空白，确认 `~/.vnc/xstartup` 启动了桌面环境（项目环境已装 `xfce4` / `gnome-session`，例如 `startxfce4 &`）。
+
+### 2. 本地主机：建立 SSH 端口转发
+
+在 **本机** 终端把服务器的 `5901` 隧道到本地 `5901`：
+
+```bash
+ssh -L 5901:localhost:5901 ubuntu@<服务器地址>
+```
+
+VS Code Remote SSH 用户：也可在端口面板（PORTS）手动 `Forward a Port` 转发 `5901`，效果相同。
+
+### 3. 本地主机：用 VNC Viewer 连接
+
+打开 `vncviewer64-1.16.2`（或任意 VNC Viewer），连接地址填：
+
+```text
+localhost:5901
+```
+
+输入第 1 步设置的 VNC 密码，即可看到服务器桌面。之后在该桌面里跑带 GUI 的命令（如下方“一键自动仿真”），Gazebo / RViz 窗口就会显示在 VNC 里。
+
+### 4. 让 ROS 图形程序使用该桌面
+
+在 **服务器的 SSH 会话** 里运行 GUI 命令前，把 `DISPLAY` 指向 VNC 桌面：
+
+```bash
+export DISPLAY=:1
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+# 之后再 ros2 launch ... gui:=true use_rviz:=true
+```
+
+> 在 VNC 桌面内打开的终端通常已自带正确 `DISPLAY`，无需手动 export。
+> 完全不需要图形界面时，所有 launch 都支持 headless：`gui:=false use_rviz:=false`。
+
+收尾 / 重启会话：
+
+```bash
+vncserver -kill :1        # 关闭桌面
+```
+
 ## 一键自动仿真（推荐先跑这个）
 
 `amr_demo.launch.py` 是完整的一键自动演示入口：拉起 Gazebo 室内仓储世界、机器人模型、Nav2 序列导航、RViz 可视化，并启动**自动演示编排器**（`amr_sim_demo_director_node`）自动下发一连串任务——巡航、站点搬运、过门 / 电梯、对桩充电、避障停车与恢复，全程无需人工干预。
@@ -145,6 +205,7 @@ source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 
 # 带图形界面 + RViz + 自动演示（默认全开）
+# 无界面服务器请先按上节起好 VNC，并 export DISPLAY=:1
 ros2 launch robot_bringup amr_demo.launch.py gui:=true use_rviz:=true
 
 # 只看自动流程、不弹 RViz
@@ -321,6 +382,34 @@ ROS → 底盘:  CMD <linear_x_mps> <angular_z_radps>
 ```
 
 运动学当前支持 `diff_drive` 与 `mecanum`；`ackermann` / `four_ws4wd` 等在实现真实转向模型前降级为 `diff_drive`。
+
+## 按岗位分模块学习
+
+本项目覆盖了机器人公司大部分软件岗位的核心技能，可以按目标岗位挑对应模块针对性学习。下表把模块映射到岗位、核心技术点和建议的代码入口。
+
+| 目标岗位 | 主学模块 | 核心技术点 | 代码入口 |
+| --- | --- | --- | --- |
+| **机器人软件工程师（综合）** | `robot_bringup` + 全栈通读 | ROS2 节点/话题/服务/动作、launch 编排、包间协作 | `src/robot_bringup/launch/`、`src/robot_interfaces*/` |
+| **导航 / 运动规划工程师** | `robot_navigation` | Nav2（planner/controller/BT）、costmap、语义区 keepout/speed filter、地图管理 | `src/robot_navigation/`（`map_manager_node`、`zone_filter_masks`、`config/`） |
+| **SLAM / 定位工程师** | `robot_navigation` + `robot_sensors` | slam_toolbox、Cartographer、EKF（robot_localization）、TF 树、传感器标定 | `robot_navigation/launch/slam.launch.py`、`robot_hardware/launch/hardware_ekf.launch.py` |
+| **运动控制工程师** | `robot_path_tracking` + `robot_hardware` | Pure Pursuit / Stanley、差速/麦轮运动学、ros2_control、`diff_drive_controller` | `robot_path_tracking/src/`、`robot_hardware/src/chassis_kinematics.cpp` |
+| **嵌入式 / 底盘驱动工程师** | `robot_hardware` | 串口/UDP 通信、自定义协议编解码、`hardware_interface` 插件、里程计积分 | `robot_hardware/src/`（`chassis_packet`、`serial/udp_backend`、`chassis_hardware_interface`） |
+| **感知 / 传感器工程师** | `robot_sensors` | LaserScan/IMU 标准化、滤波、坐标系统一、diagnostics | `src/robot_sensors/src/` |
+| **任务调度 / 系统工程师** | `robot_tasks` | 任务队列/优先级/抢占、状态机、behavior tree、失败恢复、成本估算 | `robot_tasks/src/`（`mission_runner_node`、`*_workflow`、`*_behavior_tree`） |
+| **AMR 车队 / Fleet 工程师** | `robot_tasks` + `robot_interfaces_*` | 多机调度、站点路网、设施联动（门/电梯/充电）、VDA 5050、订单路由 | `robot_tasks/src/`（`fleet_*`、`facility_*`、`station_*`、`submit_order_router`） |
+| **功能安全工程师** | `robot_teleop` + `robot_utils` | cmd_vel 仲裁、急停、watchdog、限速、诊断聚合、故障监督闭环 | `robot_teleop/src/`、`robot_utils/src/`（`system_monitor`、`fault_supervisor`） |
+| **仿真 / 工具链工程师** | `robot_simulation` + `robot_description` | Gazebo 世界搭建、ros_gz bridge、URDF/Xacro、RViz 可视化、自动演示编排 | `robot_simulation/`（`worlds/`、`amr_sim_*_node`）、`robot_description/urdf/` |
+| **后端 / 上位机 / 集成工程师** | `scripts/` + `tools/` | REST gateway、VDA 5050 桥接、MQTT、webhook 回调、运营控制台 | `scripts/rest_api_gateway.py`、`scripts/vda5050_*`、`tools/operator_console.html` |
+| **测试 / DevOps 工程师** | `scripts/` + 各包 `test/` | GoogleTest、launch_testing、headless 验收、CI、Docker | `scripts/check_robot.sh`、各包 `test/`、`.github/`、`docker/` |
+
+### 建议学习路径
+
+- **零基础入门**：先 `robot_bringup` 跑通[一键自动仿真](#一键自动仿真推荐先跑这个) → 读 `robot_description`（机器人长什么样）→ `robot_sensors`（数据从哪来）→ `robot_path_tracking`（最直观的控制闭环）。
+- **算法方向**：`robot_navigation`（导航/SLAM）+ `robot_path_tracking`（控制），配合 `robot_experiments` 做对比 benchmark。
+- **工程 / 平台方向**：`robot_tasks`（调度中枢，项目最有分量的部分）+ `robot_interfaces_*`（接口设计）+ `scripts/`（北向接口与验收）。
+- **底层 / 硬件方向**：`robot_hardware`（协议与 ros2_control）+ `robot_teleop` + `robot_utils`（安全与诊断）。
+
+> 每个模块都能独立编译运行（`colcon build --packages-select <包名>`），可以单点深入而不必通读全项目。
 
 ## 许可与说明
 
