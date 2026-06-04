@@ -13,6 +13,9 @@ log/
 compile_commands.json
 CMakeUserPresets.json
 
+# 例外：3D 模型资产（Wavefront OBJ），不是编译产物，必须纳入版本库
+!src/robot_simulation/media/text_meshes/*.obj
+
 # --- 环境与缓存 ---
 .env
 .env.*
