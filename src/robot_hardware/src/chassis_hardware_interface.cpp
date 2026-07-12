@@ -156,14 +156,24 @@ hardware_interface::return_type ChassisHardwareInterface::write(
 
 bool ChassisHardwareInterface::LoadParameters() {
   backend_name_ = ParameterAsString(info_, "backend", "mock");
+  const std::string requested_chassis_type =
+      ParameterAsString(info_, "chassis_type", "diff_drive");
+  if (requested_chassis_type != "diff_drive") {
+    RCLCPP_ERROR(
+        rclcpp::get_logger("ChassisHardwareInterface"),
+        "unsupported ros2_control chassis_type '%s': current hardware interface exports only "
+        "left_wheel_joint and right_wheel_joint; supported value: diff_drive",
+        requested_chassis_type.c_str());
+    return false;
+  }
+
   backend_config_.serial_device = ParameterAsString(info_, "serial_device", "/dev/ttyUSB0");
   backend_config_.serial_baud = ParameterAsInt(info_, "serial_baud", 115200);
   backend_config_.udp_host = ParameterAsString(info_, "udp_host", "192.168.1.10");
   backend_config_.udp_port = ParameterAsInt(info_, "udp_port", 9000);
   backend_config_.protocol = ParameterAsString(info_, "protocol", "text");
   adapter_config_.protocol = backend_config_.protocol;
-  adapter_config_.kinematics_model =
-      ParameterAsString(info_, "chassis_type", adapter_config_.kinematics_model);
+  adapter_config_.kinematics_model = requested_chassis_type;
   adapter_config_.wheel_diameter_m =
       ParameterAsDouble(info_, "wheel_diameter_m", adapter_config_.wheel_diameter_m);
   adapter_config_.wheel_base_m =

@@ -72,6 +72,12 @@ if(BUILD_TESTING)
   target_link_libraries(chassis_packet_test robot_hardware_backends)
   ament_add_gtest(chassis_system_adapter_test test/chassis_system_adapter_test.cpp)
   target_link_libraries(chassis_system_adapter_test robot_hardware_backends)
+  ament_add_gtest(
+    chassis_hardware_interface_test
+    test/chassis_hardware_interface_test.cpp)
+  target_link_libraries(chassis_hardware_interface_test robot_chassis_hardware)
+  ament_target_dependencies(chassis_hardware_interface_test
+    hardware_interface rclcpp rclcpp_lifecycle)
 endif()
 
 ament_export_include_directories(include)

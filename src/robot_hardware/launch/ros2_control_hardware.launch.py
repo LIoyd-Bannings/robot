@@ -50,7 +50,14 @@ def generate_launch_description():
             DeclareLaunchArgument("ip", default_value="192.168.1.10"),
             DeclareLaunchArgument("port", default_value="9000"),
             DeclareLaunchArgument("protocol", default_value="text"),
-            DeclareLaunchArgument("chassis_type", default_value="diff_drive"),
+            DeclareLaunchArgument(
+                "chassis_type",
+                default_value="diff_drive",
+                description=(
+                    "Chassis kinematics for the two-wheel ros2_control hardware interface; "
+                    "only diff_drive is supported"
+                ),
+            ),
             DeclareLaunchArgument(
                 "controllers_file",
                 default_value=PathJoinSubstitution(
