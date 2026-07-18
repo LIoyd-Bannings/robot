@@ -17,7 +17,7 @@ mkdir -p "${LOG_DIR}"
 
 cleanup_known_processes() {
   local patterns=(
-    "gz sim .*indoor_room.sdf"
+    "gz sim .*indoor_room_.*\\.sdf"
     "ros_gz_bridge parameter_bridge"
     "ros_gz_bridge/parameter_bridge"
     "amr_sim_visualizer_node"

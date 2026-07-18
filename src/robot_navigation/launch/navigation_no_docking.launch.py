@@ -87,6 +87,7 @@ def generate_launch_description():
     log_level = LaunchConfiguration("log_level")
     use_zone_filters = LaunchConfiguration("use_zone_filters")
     zone_filter_params_file = LaunchConfiguration("zone_filter_params_file")
+    footprint_file = LaunchConfiguration("footprint_file")
     zone_filters_launch = PathJoinSubstitution(
         [FindPackageShare("robot_navigation"), "launch", "zone_filters.launch.py"]
     )
@@ -97,6 +98,9 @@ def generate_launch_description():
             "filters",
             "indoor_room_nav2_costmap_filters.yaml",
         ]
+    )
+    default_footprint_file = PathJoinSubstitution(
+        [FindPackageShare("robot_navigation"), "config", "robot_footprint.yaml"]
     )
     zone_filter_actions = [
         IncludeLaunchDescription(
@@ -120,9 +124,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "zone_filter_params_file", default_value=default_zone_filter_params
             ),
-            create_navigation_group([params_file], UnlessCondition(use_zone_filters)),
+            DeclareLaunchArgument("footprint_file", default_value=default_footprint_file),
             create_navigation_group(
-                [params_file, zone_filter_params_file],
+                [params_file, footprint_file], UnlessCondition(use_zone_filters)
+            ),
+            create_navigation_group(
+                [params_file, zone_filter_params_file, footprint_file],
                 IfCondition(use_zone_filters),
                 zone_filter_actions,
             ),

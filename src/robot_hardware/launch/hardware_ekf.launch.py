@@ -17,6 +17,10 @@ def generate_launch_description():
     imu_source = LaunchConfiguration("imu_source")
     ekf_params_file = LaunchConfiguration("ekf_params_file")
     ekf_output_topic = LaunchConfiguration("ekf_output_topic")
+    calibration_file = LaunchConfiguration("calibration_file")
+    default_calibration_file = PathJoinSubstitution(
+        [FindPackageShare("robot_hardware"), "config", "chassis_calibration.yaml"]
+    )
     return LaunchDescription(
         [
             DeclareLaunchArgument("backend", default_value="mock"),
@@ -28,6 +32,7 @@ def generate_launch_description():
             DeclareLaunchArgument("protocol", default_value="text"),
             DeclareLaunchArgument("chassis_type", default_value="diff_drive"),
             DeclareLaunchArgument("imu_source", default_value="auto"),
+            DeclareLaunchArgument("calibration_file", default_value=default_calibration_file),
             DeclareLaunchArgument(
                 "ekf_params_file",
                 default_value=PathJoinSubstitution(
@@ -39,6 +44,7 @@ def generate_launch_description():
                 package="robot_hardware",
                 executable="chassis_driver_node",
                 parameters=[
+                    calibration_file,
                     {
                         "backend": backend,
                         "publish_tf": False,

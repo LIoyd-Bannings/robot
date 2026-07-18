@@ -12,6 +12,7 @@ def generate_launch_description():
     navigation_start_delay = LaunchConfiguration("navigation_start_delay")
     use_zone_filters = LaunchConfiguration("use_zone_filters")
     zone_filter_params_file = LaunchConfiguration("zone_filter_params_file")
+    footprint_file = LaunchConfiguration("footprint_file")
     localization_launch = PathJoinSubstitution(
         [FindPackageShare("nav2_bringup"), "launch", "localization_launch.py"]
     )
@@ -32,6 +33,9 @@ def generate_launch_description():
             "indoor_room_nav2_costmap_filters.yaml",
         ]
     )
+    default_footprint_file = PathJoinSubstitution(
+        [FindPackageShare("robot_navigation"), "config", "robot_footprint.yaml"]
+    )
     return LaunchDescription(
         [
             DeclareLaunchArgument("params_file", default_value=default_params),
@@ -42,6 +46,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "zone_filter_params_file", default_value=default_zone_filter_params
             ),
+            DeclareLaunchArgument("footprint_file", default_value=default_footprint_file),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(localization_launch),
                 launch_arguments={
@@ -63,6 +68,7 @@ def generate_launch_description():
                             "autostart": "true",
                             "use_zone_filters": use_zone_filters,
                             "zone_filter_params_file": zone_filter_params_file,
+                            "footprint_file": footprint_file,
                         }.items(),
                     )
                 ],

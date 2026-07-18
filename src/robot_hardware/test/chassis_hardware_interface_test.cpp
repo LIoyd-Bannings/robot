@@ -41,6 +41,11 @@ hardware_interface::HardwareComponentInterfaceParams MakeParams(
   info.hardware_parameters["wheel_diameter_m"] = "0.15";
   info.hardware_parameters["wheel_base_m"] = "0.42";
   info.hardware_parameters["track_width_m"] = "0.43";
+  info.hardware_parameters["calibration_profile"] = "nominal_reference";
+  info.hardware_parameters["left_encoder_scale"] = "1.0";
+  info.hardware_parameters["right_encoder_scale"] = "1.0";
+  info.hardware_parameters["left_direction_sign"] = "1";
+  info.hardware_parameters["right_direction_sign"] = "1";
   if (chassis_type.has_value()) {
     info.hardware_parameters["chassis_type"] = *chassis_type;
   }
@@ -77,6 +82,34 @@ TEST_F(ChassisHardwareInterfaceTest, OnInit_ExplicitDiffDrive_Succeeds) {
   EXPECT_EQ(
       hardware.on_init(MakeParams("diff_drive")), hardware_interface::CallbackReturn::SUCCESS);
 }
+
+class InvalidHardwareParameterTest
+    : public ChassisHardwareInterfaceTest,
+      public ::testing::WithParamInterface<std::pair<std::string, std::string>> {};
+
+TEST_P(InvalidHardwareParameterTest, OnInit_InvalidParameter_ReturnsError) {
+  ChassisHardwareInterface hardware;
+  auto params = MakeParams("diff_drive");
+  params.hardware_info.hardware_parameters[GetParam().first] = GetParam().second;
+
+  EXPECT_EQ(hardware.on_init(params), hardware_interface::CallbackReturn::ERROR);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidParameters, InvalidHardwareParameterTest,
+    ::testing::Values(
+        std::pair<std::string, std::string>{"serial_baud", "115200junk"},
+        std::pair<std::string, std::string>{"udp_port", "9000.5"},
+        std::pair<std::string, std::string>{"wheel_diameter_m", "0"},
+        std::pair<std::string, std::string>{"wheel_base_m", "-0.42"},
+        std::pair<std::string, std::string>{"track_width_m", "nan"},
+        std::pair<std::string, std::string>{"left_encoder_scale", "1.0junk"},
+        std::pair<std::string, std::string>{"right_encoder_scale", "-1"},
+        std::pair<std::string, std::string>{"left_direction_sign", "0"},
+        std::pair<std::string, std::string>{"left_direction_sign", "not-an-int"},
+        std::pair<std::string, std::string>{"right_direction_sign", "2"},
+        std::pair<std::string, std::string>{"left_direction_sign", "-1"},
+        std::pair<std::string, std::string>{"calibration_profile", ""}));
 
 class UnsupportedChassisTypeTest
     : public ChassisHardwareInterfaceTest,

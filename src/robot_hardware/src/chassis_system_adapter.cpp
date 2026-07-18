@@ -1,17 +1,61 @@
 #include "robot_hardware/chassis_system_adapter.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <utility>
 
 namespace robot_hardware {
 
+bool ValidateChassisSystemAdapterConfig(
+    const ChassisSystemAdapterConfig& config, std::string* error) {
+  const auto fail = [error](const std::string& message) {
+    if (error != nullptr) {
+      *error = message;
+    }
+    return false;
+  };
+  if (config.calibration_profile.empty()) {
+    return fail("calibration_profile must not be empty");
+  }
+  for (const auto& value : {
+           std::pair{"wheel_diameter_m", config.wheel_diameter_m},
+           std::pair{"wheel_base_m", config.wheel_base_m},
+           std::pair{"track_width_m", config.track_width_m},
+           std::pair{"left_encoder_scale", config.left_encoder_scale},
+           std::pair{"right_encoder_scale", config.right_encoder_scale},
+           std::pair{"fallback_battery_voltage", config.fallback_battery_voltage},
+       }) {
+    if (!std::isfinite(value.second) || value.second <= 0.0) {
+      return fail(std::string(value.first) + " must be a finite positive value");
+    }
+  }
+  if ((config.left_direction_sign != -1 && config.left_direction_sign != 1) ||
+      (config.right_direction_sign != -1 && config.right_direction_sign != 1)) {
+    return fail("wheel direction signs must be either -1 or 1");
+  }
+  if (config.left_encoder_scale != 1.0 || config.right_encoder_scale != 1.0 ||
+      config.left_direction_sign != 1 || config.right_direction_sign != 1) {
+    return fail(
+        "non-identity encoder scale or direction is not supported because the current "
+        "backends expose body-frame odometry rather than raw wheel encoders");
+  }
+  if (error != nullptr) {
+    error->clear();
+  }
+  return true;
+}
+
 ChassisSystemAdapter::ChassisSystemAdapter(
     std::unique_ptr<ChassisBackend> backend, ChassisSystemAdapterConfig config)
     : backend_(std::move(backend)), config_(std::move(config)) {
   if (!backend_) {
     throw std::invalid_argument("ChassisSystemAdapter requires a backend");
+  }
+  std::string validation_error;
+  if (!ValidateChassisSystemAdapterConfig(config_, &validation_error)) {
+    throw std::invalid_argument("invalid chassis calibration: " + validation_error);
   }
   config_.kinematics_model = NormalizeKinematicsModel(config_.kinematics_model);
   state_.backend_name = backend_->Name();

@@ -1,12 +1,12 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
     backend = LaunchConfiguration("backend")
-    sensor_source = LaunchConfiguration("sensor_source")
     dev = LaunchConfiguration("dev")
     baud = LaunchConfiguration("baud")
     ip = LaunchConfiguration("ip")
@@ -17,6 +17,10 @@ def generate_launch_description():
     publish_tf = LaunchConfiguration("publish_tf")
     publish_odom = LaunchConfiguration("publish_odom")
     imu_source = LaunchConfiguration("imu_source")
+    calibration_file = LaunchConfiguration("calibration_file")
+    default_calibration_file = PathJoinSubstitution(
+        [FindPackageShare("robot_hardware"), "config", "chassis_calibration.yaml"]
+    )
     return LaunchDescription(
         [
             DeclareLaunchArgument("backend", default_value="mock"),
@@ -31,10 +35,12 @@ def generate_launch_description():
             DeclareLaunchArgument("publish_tf", default_value="true"),
             DeclareLaunchArgument("publish_odom", default_value="true"),
             DeclareLaunchArgument("imu_source", default_value="auto"),
+            DeclareLaunchArgument("calibration_file", default_value=default_calibration_file),
             Node(
                 package="robot_hardware",
                 executable="chassis_driver_node",
                 parameters=[
+                    calibration_file,
                     {
                         "backend": backend,
                         "publish_tf": publish_tf,

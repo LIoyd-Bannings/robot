@@ -17,11 +17,20 @@ from sensor_msgs.msg import LaserScan
 from launch_testing_ros import WaitForTopics
 
 
+def _static_base_tf_node():
+    return launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0", "0", "0.075", "0", "0", "0", "base_footprint", "base_link"],
+        output="screen",
+    )
+
+
 def _static_lidar_tf_node():
     return launch_ros.actions.Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0.18", "0", "0.27", "0", "0", "0", "base_footprint", "lidar_link"],
+        arguments=["0.18", "0", "0.27", "0", "0", "0", "base_link", "lidar_link"],
         output="screen",
     )
 
@@ -59,6 +68,7 @@ def _wait_for_lifecycle_state(service_name, expected_label, timeout_sec=30.0):
 
 
 def generate_test_description():
+    static_base_tf = _static_base_tf_node()
     static_lidar_tf = _static_lidar_tf_node()
     chassis = launch_ros.actions.Node(
         package="robot_hardware",
@@ -83,6 +93,7 @@ def generate_test_description():
     return (
         launch.LaunchDescription(
             [
+                static_base_tf,
                 static_lidar_tf,
                 chassis,
                 fake_scan,
@@ -91,6 +102,7 @@ def generate_test_description():
             ]
         ),
         {
+            "static_base_tf": static_base_tf,
             "static_lidar_tf": static_lidar_tf,
             "chassis": chassis,
             "fake_scan": fake_scan,

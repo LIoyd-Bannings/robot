@@ -17,14 +17,24 @@ def generate_launch_description():
     io_timeout_ms = LaunchConfiguration("io_timeout_ms")
     protocol = LaunchConfiguration("protocol")
     chassis_type = LaunchConfiguration("chassis_type")
+    geometry_file = LaunchConfiguration("geometry_file")
+    calibration_file = LaunchConfiguration("calibration_file")
     robot_description_file = PathJoinSubstitution(
         [FindPackageShare("robot_description"), "urdf", "robot.urdf.xacro"]
     )
     robot_description = {
-        "robot_description": Command(["xacro ", robot_description_file])
+        "robot_description": Command(
+            ["xacro ", robot_description_file, " geometry_file:=", geometry_file]
+        )
     }
     cmd_vel_stack_launch = PathJoinSubstitution(
         [FindPackageShare("robot_teleop"), "launch", "cmd_vel_stack.launch.py"]
+    )
+    default_geometry_file = PathJoinSubstitution(
+        [FindPackageShare("robot_description"), "config", "robot_geometry.yaml"]
+    )
+    default_calibration_file = PathJoinSubstitution(
+        [FindPackageShare("robot_hardware"), "config", "chassis_calibration.yaml"]
     )
 
     return LaunchDescription(
@@ -40,6 +50,8 @@ def generate_launch_description():
             DeclareLaunchArgument("protocol", default_value="text"),
             DeclareLaunchArgument("chassis_type", default_value="diff_drive"),
             DeclareLaunchArgument("use_twist_mux", default_value="true"),
+            DeclareLaunchArgument("geometry_file", default_value=default_geometry_file),
+            DeclareLaunchArgument("calibration_file", default_value=default_calibration_file),
             Node(
                 package="robot_state_publisher",
                 executable="robot_state_publisher",
@@ -65,6 +77,7 @@ def generate_launch_description():
                 package="robot_hardware",
                 executable="chassis_driver_node",
                 parameters=[
+                    calibration_file,
                     {
                         "backend": backend,
                         "mode": mode,

@@ -1,8 +1,11 @@
 #include "robot_hardware/chassis_hardware_interface.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
+#include <optional>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -20,16 +23,29 @@ double ParameterAsDouble(
   if (it == info.hardware_parameters.end()) {
     return fallback;
   }
-  return std::strtod(it->second.c_str(), nullptr);
+  errno = 0;
+  char* end = nullptr;
+  const double value = std::strtod(it->second.c_str(), &end);
+  if (errno == ERANGE || end == it->second.c_str() || end == nullptr || *end != '\0') {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  return value;
 }
 
-int ParameterAsInt(
+std::optional<int> ParameterAsInt(
     const hardware_interface::HardwareInfo& info, const std::string& name, const int fallback) {
   const auto it = info.hardware_parameters.find(name);
   if (it == info.hardware_parameters.end()) {
     return fallback;
   }
-  return static_cast<int>(std::strtol(it->second.c_str(), nullptr, 10));
+  errno = 0;
+  char* end = nullptr;
+  const long value = std::strtol(it->second.c_str(), &end, 10);
+  if (errno == ERANGE || end == it->second.c_str() || end == nullptr || *end != '\0' ||
+      value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
+    return std::nullopt;
+  }
+  return static_cast<int>(value);
 }
 
 std::string ParameterAsString(
@@ -155,7 +171,25 @@ hardware_interface::return_type ChassisHardwareInterface::write(
 }
 
 bool ChassisHardwareInterface::LoadParameters() {
+  const auto load_integer_parameter = [this](
+                                          const char* name, const int fallback,
+                                          int* output) {
+    const auto value = ParameterAsInt(info_, name, fallback);
+    if (!value.has_value()) {
+      const auto raw = info_.hardware_parameters.find(name);
+      RCLCPP_ERROR(
+          rclcpp::get_logger("ChassisHardwareInterface"),
+          "invalid integer hardware parameter '%s': '%s'", name,
+          raw == info_.hardware_parameters.end() ? "" : raw->second.c_str());
+      return false;
+    }
+    *output = *value;
+    return true;
+  };
+
   backend_name_ = ParameterAsString(info_, "backend", "mock");
+  calibration_profile_ =
+      ParameterAsString(info_, "calibration_profile", "nominal_reference");
   const std::string requested_chassis_type =
       ParameterAsString(info_, "chassis_type", "diff_drive");
   if (requested_chassis_type != "diff_drive") {
@@ -168,11 +202,14 @@ bool ChassisHardwareInterface::LoadParameters() {
   }
 
   backend_config_.serial_device = ParameterAsString(info_, "serial_device", "/dev/ttyUSB0");
-  backend_config_.serial_baud = ParameterAsInt(info_, "serial_baud", 115200);
   backend_config_.udp_host = ParameterAsString(info_, "udp_host", "192.168.1.10");
-  backend_config_.udp_port = ParameterAsInt(info_, "udp_port", 9000);
+  if (!load_integer_parameter("serial_baud", 115200, &backend_config_.serial_baud) ||
+      !load_integer_parameter("udp_port", 9000, &backend_config_.udp_port)) {
+    return false;
+  }
   backend_config_.protocol = ParameterAsString(info_, "protocol", "text");
   adapter_config_.protocol = backend_config_.protocol;
+  adapter_config_.calibration_profile = calibration_profile_;
   adapter_config_.kinematics_model = requested_chassis_type;
   adapter_config_.wheel_diameter_m =
       ParameterAsDouble(info_, "wheel_diameter_m", adapter_config_.wheel_diameter_m);
@@ -180,9 +217,33 @@ bool ChassisHardwareInterface::LoadParameters() {
       ParameterAsDouble(info_, "wheel_base_m", adapter_config_.wheel_base_m);
   adapter_config_.track_width_m =
       ParameterAsDouble(info_, "track_width_m", adapter_config_.track_width_m);
+  adapter_config_.left_encoder_scale =
+      ParameterAsDouble(info_, "left_encoder_scale", 1.0);
+  adapter_config_.right_encoder_scale =
+      ParameterAsDouble(info_, "right_encoder_scale", 1.0);
+  if (!load_integer_parameter(
+          "left_direction_sign", 1, &adapter_config_.left_direction_sign) ||
+      !load_integer_parameter(
+          "right_direction_sign", 1, &adapter_config_.right_direction_sign)) {
+    return false;
+  }
   adapter_config_.fallback_battery_voltage =
       ParameterAsDouble(info_, "fallback_battery_voltage", 24.0);
-  return adapter_config_.wheel_diameter_m > 0.0 && adapter_config_.track_width_m > 0.0;
+  std::string calibration_error;
+  if (!ValidateChassisSystemAdapterConfig(adapter_config_, &calibration_error)) {
+    RCLCPP_ERROR(
+        rclcpp::get_logger("ChassisHardwareInterface"),
+        "invalid chassis calibration profile '%s': %s", calibration_profile_.c_str(),
+        calibration_error.c_str());
+    return false;
+  }
+  RCLCPP_INFO(
+      rclcpp::get_logger("ChassisHardwareInterface"),
+      "chassis calibration loaded: profile=%s wheel_diameter_m=%.6f wheel_base_m=%.6f "
+      "track_width_m=%.6f",
+      calibration_profile_.c_str(), adapter_config_.wheel_diameter_m,
+      adapter_config_.wheel_base_m, adapter_config_.track_width_m);
+  return true;
 }
 
 bool ChassisHardwareInterface::ValidateJoints() const {

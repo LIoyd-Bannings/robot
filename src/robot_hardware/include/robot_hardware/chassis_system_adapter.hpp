@@ -10,13 +10,21 @@
 namespace robot_hardware {
 
 struct ChassisSystemAdapterConfig {
+  std::string calibration_profile = "nominal_reference";
   std::string kinematics_model = "diff_drive";
   std::string protocol = "text";
   double wheel_diameter_m = 0.15;
   double wheel_base_m = 0.42;
-  double track_width_m = 0.36;
+  double track_width_m = 0.43;
+  double left_encoder_scale = 1.0;
+  double right_encoder_scale = 1.0;
+  int left_direction_sign = 1;
+  int right_direction_sign = 1;
   double fallback_battery_voltage = 24.0;
 };
+
+bool ValidateChassisSystemAdapterConfig(
+    const ChassisSystemAdapterConfig& config, std::string* error);
 
 struct ChassisSystemState {
   std::string backend_name;

@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORLD = ROOT / "src" / "robot_simulation" / "worlds" / "indoor_room.sdf"
+WORLD_TEMPLATE = ROOT / "src" / "robot_simulation" / "worlds" / "indoor_room.sdf.xacro"
 MESH_DIR = ROOT / "src" / "robot_simulation" / "media" / "text_meshes"
 
 FONT_CANDIDATES = [
@@ -158,7 +158,7 @@ def model_xml(spec: LabelSpec) -> str:
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/{spec.mesh_name}</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${{simulation_media_path}}/text_meshes/{spec.mesh_name}</uri></mesh></geometry>
           <material>
             <ambient>{r:.3f} {g:.3f} {b:.3f} 1</ambient>
             <diffuse>{r:.3f} {g:.3f} {b:.3f} 1</diffuse>
@@ -203,11 +203,11 @@ def main() -> None:
     for spec in [*OBJECT_LABELS, *STATUS_LABELS]:
         write_obj(spec)
 
-    text = WORLD.read_text(encoding="utf-8")
+    text = WORLD_TEMPLATE.read_text(encoding="utf-8")
     start = text.index("    <!-- BEGIN AMR_TEXT_LABEL_MODELS -->")
     end_marker = "    <!-- END AMR_STATUS_LABEL_MODELS -->"
     end = text.index(end_marker, start) + len(end_marker)
-    WORLD.write_text(text[:start] + generated_section() + text[end:], encoding="utf-8")
+    WORLD_TEMPLATE.write_text(text[:start] + generated_section() + text[end:], encoding="utf-8")
 
 
 if __name__ == "__main__":

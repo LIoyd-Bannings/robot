@@ -14,6 +14,8 @@ def generate_launch_description():
     protocol = LaunchConfiguration("protocol")
     chassis_type = LaunchConfiguration("chassis_type")
     controllers_file = LaunchConfiguration("controllers_file")
+    geometry_file = LaunchConfiguration("geometry_file")
+    calibration_file = LaunchConfiguration("calibration_file")
 
     robot_description_file = PathJoinSubstitution(
         [FindPackageShare("robot_description"), "urdf", "robot.urdf.xacro"]
@@ -23,6 +25,10 @@ def generate_launch_description():
             [
                 "xacro ",
                 robot_description_file,
+                " geometry_file:=",
+                geometry_file,
+                " calibration_file:=",
+                calibration_file,
                 " use_ros2_control_hardware:=true",
                 " ros2_control_backend:=",
                 backend,
@@ -41,6 +47,12 @@ def generate_launch_description():
             ]
         )
     }
+    default_geometry_file = PathJoinSubstitution(
+        [FindPackageShare("robot_description"), "config", "robot_geometry.yaml"]
+    )
+    default_calibration_file = PathJoinSubstitution(
+        [FindPackageShare("robot_hardware"), "config", "chassis_calibration.yaml"]
+    )
 
     return LaunchDescription(
         [
@@ -50,6 +62,8 @@ def generate_launch_description():
             DeclareLaunchArgument("ip", default_value="192.168.1.10"),
             DeclareLaunchArgument("port", default_value="9000"),
             DeclareLaunchArgument("protocol", default_value="text"),
+            DeclareLaunchArgument("geometry_file", default_value=default_geometry_file),
+            DeclareLaunchArgument("calibration_file", default_value=default_calibration_file),
             DeclareLaunchArgument(
                 "chassis_type",
                 default_value="diff_drive",

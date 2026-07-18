@@ -1,6 +1,7 @@
 #include "robot_hardware/chassis_system_adapter.hpp"
 
 #include <deque>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -57,6 +58,41 @@ TEST(ChassisSystemAdapterTest, Constructor_NullBackend_ThrowsInvalidArgument) {
   EXPECT_THROW(ChassisSystemAdapter(nullptr), std::invalid_argument);
 }
 
+TEST(ChassisSystemAdapterTest, ValidateCalibration_DefaultReferenceConfiguration_Succeeds) {
+  ChassisSystemAdapterConfig config;
+  std::string error;
+
+  EXPECT_TRUE(ValidateChassisSystemAdapterConfig(config, &error));
+  EXPECT_TRUE(error.empty());
+  EXPECT_DOUBLE_EQ(config.track_width_m, 0.43);
+}
+
+TEST(ChassisSystemAdapterTest, Constructor_InvalidCalibration_ThrowsBeforeBackendUse) {
+  ChassisSystemAdapterConfig config;
+  config.track_width_m = 0.0;
+
+  EXPECT_THROW(
+      ChassisSystemAdapter(std::make_unique<MockBackend>(), config), std::invalid_argument);
+}
+
+TEST(ChassisSystemAdapterTest, ValidateCalibration_NonFiniteGeometry_Fails) {
+  ChassisSystemAdapterConfig config;
+  config.wheel_diameter_m = std::numeric_limits<double>::quiet_NaN();
+  std::string error;
+
+  EXPECT_FALSE(ValidateChassisSystemAdapterConfig(config, &error));
+  EXPECT_NE(error.find("wheel_diameter_m"), std::string::npos);
+}
+
+TEST(ChassisSystemAdapterTest, ValidateCalibration_NonIdentityEncoderCorrection_FailsClearly) {
+  ChassisSystemAdapterConfig config;
+  config.left_direction_sign = -1;
+  std::string error;
+
+  EXPECT_FALSE(ValidateChassisSystemAdapterConfig(config, &error));
+  EXPECT_NE(error.find("raw wheel encoders"), std::string::npos);
+}
+
 TEST(ChassisSystemAdapterTest, Write_ClosedBackend_ReturnsError) {
   ChassisSystemAdapter adapter(std::make_unique<MockBackend>());
 
@@ -92,6 +128,25 @@ TEST(ChassisSystemAdapterTest, Read_MockDiffDriveCommand_IntegratesPlanarState) 
   EXPECT_NEAR(state.angular_z_radps, 0.2, 1e-9);
   EXPECT_NEAR(backend_ptr->LastCommand().linear_y_mps, 0.0, 1e-9);
   EXPECT_NE(state.wheel_speeds.rpm[0], state.wheel_speeds.rpm[1]);
+}
+
+TEST(ChassisSystemAdapterTest, Read_MockDiffDrive_UsesConfiguredEffectiveTrackWidth) {
+  ChassisSystemAdapterConfig config;
+  config.track_width_m = 0.50;
+  ChassisSystemAdapter adapter(std::make_unique<MockBackend>(), config);
+  ASSERT_TRUE(adapter.Open(nullptr));
+  ChassisCommand command;
+  command.angular_z_radps = 1.0;
+  ASSERT_TRUE(adapter.Write(command, nullptr));
+
+  ChassisSystemState state;
+  ASSERT_TRUE(adapter.Read(0.1, &state, nullptr));
+  const WheelSpeeds expected = EstimateWheelSpeeds(
+      command, "diff_drive", config.wheel_diameter_m, config.wheel_base_m,
+      config.track_width_m);
+
+  EXPECT_NEAR(state.wheel_speeds.rpm[0], expected.rpm[0], 1e-9);
+  EXPECT_NEAR(state.wheel_speeds.rpm[1], expected.rpm[1], 1e-9);
 }
 
 TEST(ChassisSystemAdapterTest, Read_MockMecanumCommand_PreservesSidewaysVelocity) {

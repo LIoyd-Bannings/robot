@@ -21,11 +21,20 @@ from sensor_msgs.msg import LaserScan
 from launch_testing_ros import WaitForTopics
 
 
+def _static_base_tf_node():
+    return launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0", "0", "0.075", "0", "0", "0", "base_footprint", "base_link"],
+        output="screen",
+    )
+
+
 def _static_lidar_tf_node():
     return launch_ros.actions.Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0.18", "0", "0.27", "0", "0", "0", "base_footprint", "lidar_link"],
+        arguments=["0.18", "0", "0.27", "0", "0", "0", "base_link", "lidar_link"],
         output="screen",
     )
 
@@ -86,6 +95,7 @@ def _wait_for_service_available(node, executor, service_name, service_type, time
 
 
 def generate_test_description():
+    static_base_tf = _static_base_tf_node()
     static_lidar_tf = _static_lidar_tf_node()
     static_map_tf = _static_map_tf_node()
     cmd_vel_mux = launch_ros.actions.Node(
@@ -117,6 +127,7 @@ def generate_test_description():
     return (
         launch.LaunchDescription(
             [
+                static_base_tf,
                 static_lidar_tf,
                 static_map_tf,
                 cmd_vel_mux,
@@ -127,6 +138,7 @@ def generate_test_description():
             ]
         ),
         {
+            "static_base_tf": static_base_tf,
             "static_lidar_tf": static_lidar_tf,
             "static_map_tf": static_map_tf,
             "cmd_vel_mux": cmd_vel_mux,

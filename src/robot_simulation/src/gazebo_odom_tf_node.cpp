@@ -4,6 +4,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "robot_simulation/planar_odometry.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 class GazeboOdomTfNode final : public rclcpp::Node {
@@ -21,9 +22,9 @@ class GazeboOdomTfNode final : public rclcpp::Node {
   }
 
  private:
-  void Publish(nav_msgs::msg::Odometry odom) {
-    odom.header.frame_id = odom_frame_;
-    odom.child_frame_id = base_frame_;
+  void Publish(const nav_msgs::msg::Odometry& input) {
+    const auto odom = robot_simulation::ProjectOdometryToPlanarFootprint(
+        input, odom_frame_, base_frame_);
     odom_pub_->publish(odom);
 
     geometry_msgs::msg::TransformStamped transform;

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -48,16 +49,37 @@ class ChassisDriverNode final : public rclcpp::Node {
         robot_hardware::NormalizeKinematicsModel(declare_parameter<std::string>("chassis_type", "diff_drive"));
     wheel_diameter_m_ = declare_parameter<double>("wheel_diameter_m", 0.15);
     wheel_base_m_ = declare_parameter<double>("wheel_base_m", 0.42);
-    track_width_m_ = declare_parameter<double>("track_width_m", 0.36);
+    track_width_m_ = declare_parameter<double>("track_width_m", 0.43);
     io_timeout_ms_ = declare_parameter<int>("io_timeout_ms", 500);
 
     robot_hardware::ChassisSystemAdapterConfig adapter_config;
+    adapter_config.calibration_profile =
+        declare_parameter<std::string>("calibration_profile", "nominal_reference");
     adapter_config.kinematics_model = kinematics_model_;
     adapter_config.protocol = backend_config_.protocol;
     adapter_config.wheel_diameter_m = wheel_diameter_m_;
     adapter_config.wheel_base_m = wheel_base_m_;
     adapter_config.track_width_m = track_width_m_;
+    adapter_config.left_encoder_scale =
+        declare_parameter<double>("left_encoder_scale", 1.0);
+    adapter_config.right_encoder_scale =
+        declare_parameter<double>("right_encoder_scale", 1.0);
+    adapter_config.left_direction_sign =
+        declare_parameter<int>("left_direction_sign", 1);
+    adapter_config.right_direction_sign =
+        declare_parameter<int>("right_direction_sign", 1);
     adapter_config.fallback_battery_voltage = battery_voltage_;
+    std::string calibration_error;
+    if (!robot_hardware::ValidateChassisSystemAdapterConfig(
+            adapter_config, &calibration_error)) {
+      throw std::invalid_argument("invalid chassis calibration: " + calibration_error);
+    }
+    RCLCPP_INFO(
+        get_logger(),
+        "chassis calibration loaded: profile=%s wheel_diameter_m=%.6f wheel_base_m=%.6f "
+        "track_width_m=%.6f",
+        adapter_config.calibration_profile.c_str(), adapter_config.wheel_diameter_m,
+        adapter_config.wheel_base_m, adapter_config.track_width_m);
     auto backend = robot_hardware::CreateChassisBackend(requested_backend_, backend_config_);
     backend_name_ = backend->Name();
     chassis_adapter_ =
@@ -339,7 +361,7 @@ class ChassisDriverNode final : public rclcpp::Node {
   double battery_voltage_ = 24.0;
   double wheel_diameter_m_ = 0.15;
   double wheel_base_m_ = 0.42;
-  double track_width_m_ = 0.36;
+  double track_width_m_ = 0.43;
   robot_hardware::ChassisCommand cmd_;
   robot_hardware::ChassisCommand wheel_odom_command_;
   rclcpp::Time last_update_;

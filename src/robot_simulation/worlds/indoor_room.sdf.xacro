@@ -1,9 +1,49 @@
 <?xml version="1.0" ?>
-<sdf version="1.9">
+<sdf xmlns:xacro="http://www.ros.org/wiki/xacro" version="1.9">
+  <xacro:arg name="geometry_file" default=""/>
+  <xacro:arg name="simulation_physics_file" default=""/>
+  <xacro:arg name="simulation_media_directory" default=""/>
+  <xacro:property name="geometry_file_path" value="$(arg geometry_file)"/>
+  <xacro:property name="simulation_physics_file_path" value="$(arg simulation_physics_file)"/>
+  <xacro:property name="simulation_media_path" value="$(arg simulation_media_directory)"/>
+  <xacro:if value="${geometry_file_path == '' or simulation_physics_file_path == '' or simulation_media_path == ''}">
+    <xacro:property name="simulation_config_error"
+      value="${xacro.fatal('geometry_file, simulation_physics_file and simulation_media_directory are required')}"
+      lazy_eval="false"/>
+  </xacro:if>
+  <xacro:property name="geometry" value="${xacro.load_yaml(geometry_file_path)}"/>
+  <xacro:property name="simulation" value="${xacro.load_yaml(simulation_physics_file_path)}"/>
+  <xacro:property name="frames" value="${geometry['frames']}"/>
+  <xacro:property name="base" value="${geometry['base']}"/>
+  <xacro:property name="drive_wheels" value="${geometry['drive_wheels']}"/>
+  <xacro:property name="caster" value="${geometry['caster']}"/>
+  <xacro:property name="sensors" value="${geometry['sensors']}"/>
+  <xacro:property name="sim_physics" value="${simulation['physics']}"/>
+  <xacro:property name="sim_sensors" value="${simulation['sensors']}"/>
+  <xacro:if value="${int(geometry['schema_version']) != 1 or int(simulation['schema_version']) != 1}">
+    <xacro:property name="simulation_schema_error"
+      value="${xacro.fatal('unsupported robot geometry or simulation physics schema version')}"
+      lazy_eval="false"/>
+  </xacro:if>
+  <xacro:if value="${not python.all([math.isfinite(float(v)) and float(v) > 0.0 for v in [frames['base_link_height_m'], base['length_m'], base['width_m'], base['height_m'], base['mass_kg'], drive_wheels['radius_m'], drive_wheels['width_m'], drive_wheels['center_separation_m'], caster['radius_m'], sim_physics['max_step_size_s'], sim_physics['real_time_factor'], sim_sensors['lidar']['update_rate_hz'], sim_sensors['imu']['update_rate_hz'], sim_sensors['camera']['update_rate_hz'], sim_sensors['camera']['horizontal_fov_rad'], sim_sensors['camera']['image_width_px'], sim_sensors['camera']['image_height_px']]])}">
+    <xacro:property name="simulation_value_error"
+      value="${xacro.fatal('robot geometry and simulation physics values must be finite and positive')}"
+      lazy_eval="false"/>
+  </xacro:if>
+  <xacro:if value="${math.fabs(float(frames['base_link_height_m']) - float(drive_wheels['radius_m'])) > 1.0e-9 or math.fabs(float(drive_wheels['joint_z_m'])) > 1.0e-9}">
+    <xacro:property name="drive_wheel_ground_contact_error"
+      value="${xacro.fatal('reference AMR ground-contact invariant requires base_link_height_m == drive_wheels.radius_m and drive_wheels.joint_z_m == 0')}"
+      lazy_eval="false"/>
+  </xacro:if>
+  <xacro:if value="${float(sim_sensors['lidar']['min_range_m']) &lt; 0.0 or float(sim_sensors['lidar']['max_range_m']) &lt;= float(sim_sensors['lidar']['min_range_m']) or float(sim_sensors['lidar']['max_angle_rad']) &lt;= float(sim_sensors['lidar']['min_angle_rad'])}">
+    <xacro:property name="simulation_sensor_range_error"
+      value="${xacro.fatal('simulation lidar range and angle bounds are invalid')}"
+      lazy_eval="false"/>
+  </xacro:if>
   <world name="indoor_room">
     <physics name="default_physics" type="ode">
-      <max_step_size>0.001</max_step_size>
-      <real_time_factor>1.0</real_time_factor>
+      <max_step_size>${sim_physics['max_step_size_s']}</max_step_size>
+      <real_time_factor>${sim_physics['real_time_factor']}</real_time_factor>
     </physics>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
@@ -427,7 +467,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_robot_1.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_robot_1.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -444,7 +484,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_robot_2.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_robot_2.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -461,7 +501,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_dock.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_dock.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -478,7 +518,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_receiving.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_receiving.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -495,7 +535,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_door.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_door.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -512,7 +552,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_elevator.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_elevator.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -529,7 +569,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_floor_2.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_floor_2.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -546,7 +586,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_storage_a.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_storage_a.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -563,7 +603,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_storage_b.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_storage_b.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -580,7 +620,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_packing.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_packing.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -597,7 +637,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_traffic.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_traffic.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -614,7 +654,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_slow_zone.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_slow_zone.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -631,7 +671,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_confirm.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_confirm.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -648,7 +688,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_payload.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_payload.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -668,7 +708,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_charging_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_charging_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -685,7 +725,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_docking_retry_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_docking_retry_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -702,7 +742,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_opportunity_charge_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_opportunity_charge_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -719,7 +759,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_top_module_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_top_module_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -736,7 +776,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_localization_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_localization_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -753,7 +793,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_manual_takeover_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_manual_takeover_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -770,7 +810,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_operator_confirmation_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_operator_confirmation_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -787,7 +827,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_traffic_block_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_traffic_block_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -804,7 +844,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_traffic_deadlock_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_traffic_deadlock_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -821,7 +861,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_traffic_reopen_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_traffic_reopen_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -838,7 +878,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_speed_limit_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_speed_limit_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -855,7 +895,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_speed_restored_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_speed_restored_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -872,7 +912,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_obstacle_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_obstacle_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -889,7 +929,7 @@
         <gravity>false</gravity>
         <visual name="text_mesh_visual">
           <cast_shadows>false</cast_shadows>
-          <geometry><mesh><uri>../media/text_meshes/label_obstacle_clear_status.obj</uri></mesh></geometry>
+          <geometry><mesh><uri>file://${simulation_media_path}/text_meshes/label_obstacle_clear_status.obj</uri></mesh></geometry>
           <material>
             <ambient>0.000 0.000 0.000 1</ambient>
             <diffuse>0.000 0.000 0.000 1</diffuse>
@@ -901,148 +941,150 @@
     </model>
     <!-- END AMR_STATUS_LABEL_MODELS -->
 
-    <model name="mobile_robot">
-      <pose>0 0 0.24 0 0 0</pose>
-      <link name="base_link">
-        <inertial><mass>24.0</mass><inertia><ixx>0.18</ixx><iyy>0.28</iyy><izz>0.36</izz></inertia></inertial>
-        <collision name="base_collision"><pose>0 0 0.18 0 0 0</pose><geometry><box><size>1.10 0.76 0.36</size></box></geometry></collision>
-        <visual name="base_visual"><pose>0 0 0.18 0 0 0</pose><geometry><box><size>1.10 0.76 0.36</size></box></geometry><material><diffuse>0.08 0.28 0.70 1</diffuse></material></visual>
-        <visual name="lidar_visual"><pose>0.36 0 0.54 0 0 0</pose><geometry><cylinder><radius>0.11</radius><length>0.11</length></cylinder></geometry><material><diffuse>0.05 0.55 0.32 1</diffuse></material></visual>
-        <visual name="camera_visual"><pose>0.58 0 0.42 0 0 0</pose><geometry><box><size>0.14 0.07 0.07</size></box></geometry><material><diffuse>0.05 0.55 0.32 1</diffuse></material></visual>
-        <sensor name="lidar" type="gpu_lidar">
-          <pose>0.36 0 0.54 0 0 0</pose>
-          <topic>/sim/scan</topic>
-          <update_rate>10</update_rate>
-          <always_on>true</always_on>
-          <lidar>
-            <scan>
-              <horizontal>
-                <samples>360</samples>
-                <resolution>1</resolution>
-                <min_angle>-3.14159265359</min_angle>
-                <max_angle>3.14159265359</max_angle>
-              </horizontal>
-            </scan>
-            <range>
-              <min>0.08</min>
-              <max>12.0</max>
-              <resolution>0.01</resolution>
-            </range>
-          </lidar>
-        </sensor>
-        <sensor name="imu" type="imu">
-          <pose>0 0 0.46 0 0 0</pose>
-          <topic>/sim/imu</topic>
-          <update_rate>100</update_rate>
-          <always_on>true</always_on>
-        </sensor>
-      </link>
-      <link name="left_wheel">
-        <pose>0 0.43 0 1.57079632679 0 0</pose>
-        <inertial><mass>0.7</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
-        <collision name="collision"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry></collision>
-        <visual name="visual"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <link name="right_wheel">
-        <pose>0 -0.43 0 1.57079632679 0 0</pose>
-        <inertial><mass>0.7</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
-        <collision name="collision"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry></collision>
-        <visual name="visual"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <link name="caster_wheel">
-        <pose>-0.4 0 -0.08 0 0 0</pose>
-        <collision name="collision"><geometry><sphere><radius>0.08</radius></sphere></geometry></collision>
-        <visual name="visual"><geometry><sphere><radius>0.08</radius></sphere></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <joint name="left_wheel_joint" type="revolute">
-        <parent>base_link</parent><child>left_wheel</child><axis><xyz>0 1 0</xyz></axis>
-      </joint>
-      <joint name="right_wheel_joint" type="revolute">
-        <parent>base_link</parent><child>right_wheel</child><axis><xyz>0 1 0</xyz></axis>
-      </joint>
-      <joint name="caster_joint" type="fixed">
-        <parent>base_link</parent><child>caster_wheel</child>
-      </joint>
-      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-        <left_joint>left_wheel_joint</left_joint>
-        <right_joint>right_wheel_joint</right_joint>
-        <wheel_separation>0.86</wheel_separation>
-        <wheel_radius>0.15</wheel_radius>
-        <topic>/cmd_vel</topic>
-        <odom_topic>/model/mobile_robot/odometry</odom_topic>
-        <frame_id>odom</frame_id>
-        <child_frame_id>base_link</child_frame_id>
-      </plugin>
-    </model>
+    <xacro:macro name="mobile_robot_model" params="name x y yaw body_color cmd_vel_topic odom_topic odom_frame base_frame scan_topic imu_topic camera_topic fleet_label:=false">
+      <model name="${name}">
+        <static>false</static>
+        <pose>${x} ${y} ${frames['base_link_height_m']} 0 0 ${yaw}</pose>
+        <link name="base_link">
+          <inertial>
+            <mass>${base['mass_kg']}</mass>
+            <inertia><ixx>${base['inertia_kg_m2']['ixx']}</ixx><iyy>${base['inertia_kg_m2']['iyy']}</iyy><izz>${base['inertia_kg_m2']['izz']}</izz></inertia>
+          </inertial>
+          <collision name="base_collision">
+            <pose>0 0 ${float(base['height_m']) / 2.0} 0 0 0</pose>
+            <geometry><box><size>${base['length_m']} ${base['width_m']} ${base['height_m']}</size></box></geometry>
+          </collision>
+          <visual name="base_visual">
+            <pose>0 0 ${float(base['height_m']) / 2.0} 0 0 0</pose>
+            <geometry><box><size>${base['length_m']} ${base['width_m']} ${base['height_m']}</size></box></geometry>
+            <material><diffuse>${body_color}</diffuse></material>
+          </visual>
+          <xacro:if value="${fleet_label}">
+            <visual name="fleet_label_visual">
+              <pose>0.05 0 ${float(base['height_m']) + 0.07} 0 0 0</pose>
+              <geometry><box><size>0.24 0.22 0.025</size></box></geometry>
+              <material><diffuse>0.85 0.47 0.16 1</diffuse></material>
+            </visual>
+          </xacro:if>
+          <collision name="lidar_collision">
+            <pose>${sensors['lidar']['xyz_m'][0]} ${sensors['lidar']['xyz_m'][1]} ${sensors['lidar']['xyz_m'][2]} ${sensors['lidar']['rpy_rad'][0]} ${sensors['lidar']['rpy_rad'][1]} ${sensors['lidar']['rpy_rad'][2]}</pose>
+            <geometry><cylinder><radius>${sensors['lidar']['radius_m']}</radius><length>${sensors['lidar']['height_m']}</length></cylinder></geometry>
+          </collision>
+          <visual name="lidar_visual">
+            <pose>${sensors['lidar']['xyz_m'][0]} ${sensors['lidar']['xyz_m'][1]} ${sensors['lidar']['xyz_m'][2]} ${sensors['lidar']['rpy_rad'][0]} ${sensors['lidar']['rpy_rad'][1]} ${sensors['lidar']['rpy_rad'][2]}</pose>
+            <geometry><cylinder><radius>${sensors['lidar']['radius_m']}</radius><length>${sensors['lidar']['height_m']}</length></cylinder></geometry>
+            <material><diffuse>0.05 0.55 0.32 1</diffuse></material>
+          </visual>
+          <collision name="camera_collision">
+            <pose>${sensors['camera']['xyz_m'][0]} ${sensors['camera']['xyz_m'][1]} ${sensors['camera']['xyz_m'][2]} ${sensors['camera']['rpy_rad'][0]} ${sensors['camera']['rpy_rad'][1]} ${sensors['camera']['rpy_rad'][2]}</pose>
+            <geometry><box><size>${sensors['camera']['size_m'][0]} ${sensors['camera']['size_m'][1]} ${sensors['camera']['size_m'][2]}</size></box></geometry>
+          </collision>
+          <visual name="camera_visual">
+            <pose>${sensors['camera']['xyz_m'][0]} ${sensors['camera']['xyz_m'][1]} ${sensors['camera']['xyz_m'][2]} ${sensors['camera']['rpy_rad'][0]} ${sensors['camera']['rpy_rad'][1]} ${sensors['camera']['rpy_rad'][2]}</pose>
+            <geometry><box><size>${sensors['camera']['size_m'][0]} ${sensors['camera']['size_m'][1]} ${sensors['camera']['size_m'][2]}</size></box></geometry>
+            <material><diffuse>0.05 0.55 0.32 1</diffuse></material>
+          </visual>
+          <sensor name="lidar" type="gpu_lidar">
+            <pose>${sensors['lidar']['xyz_m'][0]} ${sensors['lidar']['xyz_m'][1]} ${sensors['lidar']['xyz_m'][2]} ${sensors['lidar']['rpy_rad'][0]} ${sensors['lidar']['rpy_rad'][1]} ${sensors['lidar']['rpy_rad'][2]}</pose>
+            <topic>${scan_topic}</topic>
+            <update_rate>${sim_sensors['lidar']['update_rate_hz']}</update_rate>
+            <always_on>true</always_on>
+            <lidar>
+              <scan>
+                <horizontal>
+                  <samples>${sim_sensors['lidar']['samples']}</samples>
+                  <resolution>${sim_sensors['lidar']['angular_resolution']}</resolution>
+                  <min_angle>${sim_sensors['lidar']['min_angle_rad']}</min_angle>
+                  <max_angle>${sim_sensors['lidar']['max_angle_rad']}</max_angle>
+                </horizontal>
+              </scan>
+              <range>
+                <min>${sim_sensors['lidar']['min_range_m']}</min>
+                <max>${sim_sensors['lidar']['max_range_m']}</max>
+                <resolution>${sim_sensors['lidar']['range_resolution_m']}</resolution>
+              </range>
+              <noise><type>gaussian</type><mean>0.0</mean><stddev>${sim_sensors['lidar']['noise_stddev_m']}</stddev></noise>
+            </lidar>
+          </sensor>
+          <sensor name="imu" type="imu">
+            <pose>${sensors['imu']['xyz_m'][0]} ${sensors['imu']['xyz_m'][1]} ${sensors['imu']['xyz_m'][2]} ${sensors['imu']['rpy_rad'][0]} ${sensors['imu']['rpy_rad'][1]} ${sensors['imu']['rpy_rad'][2]}</pose>
+            <topic>${imu_topic}</topic>
+            <update_rate>${sim_sensors['imu']['update_rate_hz']}</update_rate>
+            <always_on>true</always_on>
+          </sensor>
+          <xacro:if value="${sim_sensors['camera']['enabled']}">
+            <sensor name="camera" type="camera">
+              <pose>${sensors['camera']['xyz_m'][0]} ${sensors['camera']['xyz_m'][1]} ${sensors['camera']['xyz_m'][2]} ${sensors['camera']['rpy_rad'][0]} ${sensors['camera']['rpy_rad'][1]} ${sensors['camera']['rpy_rad'][2]}</pose>
+              <topic>${camera_topic}</topic>
+              <update_rate>${sim_sensors['camera']['update_rate_hz']}</update_rate>
+              <always_on>true</always_on>
+              <camera>
+                <horizontal_fov>${sim_sensors['camera']['horizontal_fov_rad']}</horizontal_fov>
+                <image>
+                  <width>${sim_sensors['camera']['image_width_px']}</width>
+                  <height>${sim_sensors['camera']['image_height_px']}</height>
+                  <format>R8G8B8</format>
+                </image>
+              </camera>
+            </sensor>
+          </xacro:if>
+        </link>
+        <link name="left_wheel">
+          <pose>${drive_wheels['joint_x_m']} ${float(drive_wheels['center_separation_m']) / 2.0} ${drive_wheels['joint_z_m']} 1.57079632679 0 0</pose>
+          <inertial><mass>${drive_wheels['mass_kg']}</mass><inertia><ixx>${drive_wheels['inertia_kg_m2']}</ixx><iyy>${drive_wheels['inertia_kg_m2']}</iyy><izz>${drive_wheels['inertia_kg_m2']}</izz></inertia></inertial>
+          <collision name="collision"><geometry><cylinder><radius>${drive_wheels['radius_m']}</radius><length>${drive_wheels['width_m']}</length></cylinder></geometry></collision>
+          <visual name="visual"><geometry><cylinder><radius>${drive_wheels['radius_m']}</radius><length>${drive_wheels['width_m']}</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
+        </link>
+        <link name="right_wheel">
+          <pose>${drive_wheels['joint_x_m']} ${-float(drive_wheels['center_separation_m']) / 2.0} ${drive_wheels['joint_z_m']} 1.57079632679 0 0</pose>
+          <inertial><mass>${drive_wheels['mass_kg']}</mass><inertia><ixx>${drive_wheels['inertia_kg_m2']}</ixx><iyy>${drive_wheels['inertia_kg_m2']}</iyy><izz>${drive_wheels['inertia_kg_m2']}</izz></inertia></inertial>
+          <collision name="collision"><geometry><cylinder><radius>${drive_wheels['radius_m']}</radius><length>${drive_wheels['width_m']}</length></cylinder></geometry></collision>
+          <visual name="visual"><geometry><cylinder><radius>${drive_wheels['radius_m']}</radius><length>${drive_wheels['width_m']}</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
+        </link>
+        <link name="caster_wheel">
+          <pose>${caster['xyz_m'][0]} ${caster['xyz_m'][1]} ${caster['xyz_m'][2]} 0 0 0</pose>
+          <inertial><mass>${caster['mass_kg']}</mass><inertia><ixx>${caster['inertia_kg_m2']}</ixx><iyy>${caster['inertia_kg_m2']}</iyy><izz>${caster['inertia_kg_m2']}</izz></inertia></inertial>
+          <collision name="collision"><geometry><sphere><radius>${caster['radius_m']}</radius></sphere></geometry></collision>
+          <visual name="visual"><geometry><sphere><radius>${caster['radius_m']}</radius></sphere></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
+        </link>
+        <joint name="left_wheel_joint" type="revolute">
+          <parent>base_link</parent><child>left_wheel</child><axis><xyz>0 1 0</xyz></axis>
+        </joint>
+        <joint name="right_wheel_joint" type="revolute">
+          <parent>base_link</parent><child>right_wheel</child><axis><xyz>0 1 0</xyz></axis>
+        </joint>
+        <joint name="caster_joint" type="fixed">
+          <parent>base_link</parent><child>caster_wheel</child>
+        </joint>
+        <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+          <left_joint>left_wheel_joint</left_joint>
+          <right_joint>right_wheel_joint</right_joint>
+          <wheel_separation>${drive_wheels['center_separation_m']}</wheel_separation>
+          <wheel_radius>${drive_wheels['radius_m']}</wheel_radius>
+          <topic>${cmd_vel_topic}</topic>
+          <odom_topic>${odom_topic}</odom_topic>
+          <frame_id>${odom_frame}</frame_id>
+          <child_frame_id>${base_frame}</child_frame_id>
+        </plugin>
+      </model>
+    </xacro:macro>
 
-    <model name="mobile_robot_2">
-      <static>false</static>
-      <pose>-3.9 -3.8 0.24 0 0 0</pose>
-      <link name="base_link">
-        <inertial><mass>24.0</mass><inertia><ixx>0.18</ixx><iyy>0.28</iyy><izz>0.36</izz></inertia></inertial>
-        <collision name="base_collision"><pose>0 0 0.18 0 0 0</pose><geometry><box><size>1.10 0.76 0.36</size></box></geometry></collision>
-        <visual name="base_visual"><pose>0 0 0.18 0 0 0</pose><geometry><box><size>1.10 0.76 0.36</size></box></geometry><material><diffuse>0.32 0.37 0.44 1</diffuse></material></visual>
-        <visual name="fleet_label_visual"><pose>0.10 0 0.43 0 0 0</pose><geometry><box><size>0.48 0.44 0.05</size></box></geometry><material><diffuse>0.85 0.47 0.16 1</diffuse></material></visual>
-        <visual name="lidar_visual"><pose>0.36 0 0.54 0 0 0</pose><geometry><cylinder><radius>0.11</radius><length>0.11</length></cylinder></geometry><material><diffuse>0.05 0.55 0.32 1</diffuse></material></visual>
-        <sensor name="lidar" type="gpu_lidar">
-          <pose>0.36 0 0.54 0 0 0</pose>
-          <topic>/robot_2/sim/scan</topic>
-          <update_rate>10</update_rate>
-          <always_on>true</always_on>
-          <lidar>
-            <scan>
-              <horizontal>
-                <samples>360</samples>
-                <resolution>1</resolution>
-                <min_angle>-3.14159265359</min_angle>
-                <max_angle>3.14159265359</max_angle>
-              </horizontal>
-            </scan>
-            <range>
-              <min>0.08</min>
-              <max>12.0</max>
-              <resolution>0.01</resolution>
-            </range>
-          </lidar>
-        </sensor>
-      </link>
-      <link name="left_wheel">
-        <pose>0 0.43 0 1.57079632679 0 0</pose>
-        <inertial><mass>0.7</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
-        <collision name="collision"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry></collision>
-        <visual name="visual"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <link name="right_wheel">
-        <pose>0 -0.43 0 1.57079632679 0 0</pose>
-        <inertial><mass>0.7</mass><inertia><ixx>0.002</ixx><iyy>0.002</iyy><izz>0.002</izz></inertia></inertial>
-        <collision name="collision"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry></collision>
-        <visual name="visual"><geometry><cylinder><radius>0.15</radius><length>0.09</length></cylinder></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <link name="caster_wheel">
-        <pose>-0.4 0 -0.08 0 0 0</pose>
-        <collision name="collision"><geometry><sphere><radius>0.08</radius></sphere></geometry></collision>
-        <visual name="visual"><geometry><sphere><radius>0.08</radius></sphere></geometry><material><diffuse>0.02 0.02 0.02 1</diffuse></material></visual>
-      </link>
-      <joint name="left_wheel_joint" type="revolute">
-        <parent>base_link</parent><child>left_wheel</child><axis><xyz>0 1 0</xyz></axis>
-      </joint>
-      <joint name="right_wheel_joint" type="revolute">
-        <parent>base_link</parent><child>right_wheel</child><axis><xyz>0 1 0</xyz></axis>
-      </joint>
-      <joint name="caster_joint" type="fixed">
-        <parent>base_link</parent><child>caster_wheel</child>
-      </joint>
-      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-        <left_joint>left_wheel_joint</left_joint>
-        <right_joint>right_wheel_joint</right_joint>
-        <wheel_separation>0.86</wheel_separation>
-        <wheel_radius>0.15</wheel_radius>
-        <topic>/robot_2/cmd_vel</topic>
-        <odom_topic>/model/mobile_robot_2/odometry</odom_topic>
-        <frame_id>robot_2/odom</frame_id>
-        <child_frame_id>robot_2/base_link</child_frame_id>
-      </plugin>
-    </model>
+    <xacro:mobile_robot_model
+      name="mobile_robot" x="0" y="0" yaw="0"
+      body_color="0.08 0.28 0.70 1"
+      cmd_vel_topic="/cmd_vel"
+      odom_topic="/model/mobile_robot/odometry"
+      odom_frame="odom" base_frame="base_link"
+      scan_topic="/sim/scan" imu_topic="/sim/imu" camera_topic="/sim/camera/image"/>
+    <xacro:mobile_robot_model
+      name="mobile_robot_2" x="-3.9" y="-3.8" yaw="0"
+      body_color="0.32 0.37 0.44 1"
+      cmd_vel_topic="/robot_2/cmd_vel"
+      odom_topic="/model/mobile_robot_2/odometry"
+      odom_frame="robot_2/odom" base_frame="robot_2/base_link"
+      scan_topic="/robot_2/sim/scan" imu_topic="/robot_2/sim/imu"
+      camera_topic="/robot_2/sim/camera/image"
+      fleet_label="${True}"/>
 
     <gui fullscreen="0">
       <!-- 默认观察机位：场景斜上方俯视 ~40°，对准房间中心，避免每次手动转视角 -->

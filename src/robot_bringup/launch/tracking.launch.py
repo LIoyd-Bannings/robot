@@ -14,11 +14,15 @@ def generate_launch_description():
     output_csv = LaunchConfiguration("output_csv")
     output_json = LaunchConfiguration("output_json")
     scenario_name = LaunchConfiguration("scenario_name")
+    calibration_file = LaunchConfiguration("calibration_file")
     default_path = PathJoinSubstitution(
         [FindPackageShare("robot_experiments"), "paths", "demo_path.txt"]
     )
     cmd_vel_stack_launch = PathJoinSubstitution(
         [FindPackageShare("robot_teleop"), "launch", "cmd_vel_stack.launch.py"]
+    )
+    default_calibration_file = PathJoinSubstitution(
+        [FindPackageShare("robot_hardware"), "config", "chassis_calibration.yaml"]
     )
     pure_pursuit_selected = PythonExpression(["'", controller, "' == 'pure_pursuit'"])
     stanley_selected = PythonExpression(["'", controller, "' == 'stanley'"])
@@ -31,6 +35,7 @@ def generate_launch_description():
             DeclareLaunchArgument("output_csv", default_value="experiment_results.csv"),
             DeclareLaunchArgument("output_json", default_value="experiment_results.json"),
             DeclareLaunchArgument("use_twist_mux", default_value="true"),
+            DeclareLaunchArgument("calibration_file", default_value=default_calibration_file),
             Node(
                 package="robot_path_tracking",
                 executable="path_publisher_node",
@@ -61,7 +66,7 @@ def generate_launch_description():
                 package="robot_hardware",
                 executable="chassis_driver_node",
                 condition=IfCondition(use_mock_chassis),
-                parameters=[{"backend": "mock", "publish_tf": True}],
+                parameters=[calibration_file, {"backend": "mock", "publish_tf": True}],
                 output="screen",
             ),
             Node(

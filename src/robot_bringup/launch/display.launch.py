@@ -8,20 +8,27 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     use_rviz = LaunchConfiguration("use_rviz")
+    geometry_file = LaunchConfiguration("geometry_file")
     robot_description_file = PathJoinSubstitution(
         [FindPackageShare("robot_description"), "urdf", "robot.urdf.xacro"]
     )
     rviz_config = PathJoinSubstitution(
         [FindPackageShare("robot_description"), "rviz", "display.rviz"]
     )
+    default_geometry_file = PathJoinSubstitution(
+        [FindPackageShare("robot_description"), "config", "robot_geometry.yaml"]
+    )
 
     robot_description = {
-        "robot_description": Command(["xacro ", robot_description_file])
+        "robot_description": Command(
+            ["xacro ", robot_description_file, " geometry_file:=", geometry_file]
+        )
     }
 
     return LaunchDescription(
         [
             DeclareLaunchArgument("use_rviz", default_value="true"),
+            DeclareLaunchArgument("geometry_file", default_value=default_geometry_file),
             Node(
                 package="robot_state_publisher",
                 executable="robot_state_publisher",

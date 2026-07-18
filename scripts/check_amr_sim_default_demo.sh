@@ -241,7 +241,7 @@ wait_startup_drive_moved 60
 wait_marker_text "payload on robot: sim_auto_tote" 150
 wait_marker_text "confirm: load_tote" 150
 wait_marker_text "elevator: lift_session" 150
-wait_marker_text "speed limit: 0.25 mps" 150
+wait_marker_text "speed limit: 0.45 mps" 150
 wait_mission_state "docking_request_sim_auto" "CHARGING" 180 \
   "docking did not reach CHARGING in default demo"
 wait_odom_near_storage_b 240

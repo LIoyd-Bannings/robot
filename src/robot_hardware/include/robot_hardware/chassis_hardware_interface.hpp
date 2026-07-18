@@ -42,6 +42,7 @@ class ChassisHardwareInterface final : public hardware_interface::SystemInterfac
 
   ChassisBackendConfig backend_config_;
   ChassisSystemAdapterConfig adapter_config_;
+  std::string calibration_profile_ = "nominal_reference";
   std::string backend_name_ = "mock";
   std::array<std::string, 2> joint_names_{"left_wheel_joint", "right_wheel_joint"};
   std::array<double, 2> wheel_position_rad_{0.0, 0.0};

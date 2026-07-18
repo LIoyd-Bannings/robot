@@ -8,12 +8,17 @@ set +u
 source "${ROOT_DIR}/install/setup.bash"
 set -u
 
-WORLD="${ROOT_DIR}/src/robot_simulation/worlds/indoor_room.sdf"
+WORLD_TEMPLATE="${ROOT_DIR}/src/robot_simulation/worlds/indoor_room.sdf.xacro"
+GEOMETRY_FILE="${ROOT_DIR}/src/robot_description/config/robot_geometry.yaml"
+SIMULATION_PHYSICS_FILE="${ROOT_DIR}/src/robot_simulation/config/simulation_physics.yaml"
+SIMULATION_MEDIA_DIRECTORY="${ROOT_DIR}/src/robot_simulation/media"
 RVIZ_CONFIG="${ROOT_DIR}/src/robot_simulation/rviz/amr_sim.rviz"
 TEXT_MESH_DIR="${ROOT_DIR}/src/robot_simulation/media/text_meshes"
 
 required_files=(
-  "${WORLD}"
+  "${WORLD_TEMPLATE}"
+  "${GEOMETRY_FILE}"
+  "${SIMULATION_PHYSICS_FILE}"
   "${RVIZ_CONFIG}"
   "${TEXT_MESH_DIR}/label_robot_1.obj"
   "${TEXT_MESH_DIR}/label_obstacle_clear_status.obj"
@@ -59,9 +64,10 @@ for script in "${required_scripts[@]}"; do
 done
 
 rg "任务看板|mission_panel|LaserScan|Map|Path|Goal" "${RVIZ_CONFIG}"
-rg "showcase_environment_polish|label_robot_1|label_obstacle_clear_status" "${WORLD}"
-rg "text_mesh_visual|../media/text_meshes/label_robot_1.obj|../media/text_meshes/label_obstacle_clear_status.obj" "${WORLD}" >/dev/null
-rg "<ambient>0.000 0.000 0.000 1</ambient>|<diffuse>0.000 0.000 0.000 1</diffuse>" "${WORLD}" >/dev/null
+rg "showcase_environment_polish|label_robot_1|label_obstacle_clear_status" "${WORLD_TEMPLATE}"
+rg -F 'file://${simulation_media_path}/text_meshes/label_robot_1.obj' "${WORLD_TEMPLATE}" >/dev/null
+rg -F 'file://${simulation_media_path}/text_meshes/label_obstacle_clear_status.obj' "${WORLD_TEMPLATE}" >/dev/null
+rg "<ambient>0.000 0.000 0.000 1</ambient>|<diffuse>0.000 0.000 0.000 1</diffuse>" "${WORLD_TEMPLATE}" >/dev/null
 rg "mtllib label_text_black.mtl|usemtl label_text_black" "${TEXT_MESH_DIR}/label_robot_1.obj" "${TEXT_MESH_DIR}/label_door.obj" >/dev/null
 rg "Kd 0.000 0.000 0.000|Ka 0.000 0.000 0.000" "${TEXT_MESH_DIR}/label_text_black.mtl" >/dev/null
 python3 - "${TEXT_MESH_DIR}" <<'PY'
@@ -97,7 +103,7 @@ if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
 PY
-if rg "albedo_map|../media/labels|<plane><normal>0 0 1</normal><size>" "${WORLD}" >/dev/null; then
+if rg "albedo_map|../media/labels|<plane><normal>0 0 1</normal><size>" "${WORLD_TEMPLATE}" >/dev/null; then
   echo "Gazebo labels must be texture-free geometry, not planes or PNG albedo maps" >&2
   exit 1
 fi
@@ -114,7 +120,14 @@ python3 -m py_compile \
 for script in "${required_scripts[@]}"; do
   bash -n "${script}"
 done
-gz sdf -k "${WORLD}" >/dev/null
+GENERATED_WORLD="$(mktemp /tmp/robot_showcase_world.XXXXXX.sdf)"
+trap 'rm -f "${GENERATED_WORLD}"' EXIT
+xacro "${WORLD_TEMPLATE}" \
+  geometry_file:="${GEOMETRY_FILE}" \
+  simulation_physics_file:="${SIMULATION_PHYSICS_FILE}" \
+  simulation_media_directory:="${SIMULATION_MEDIA_DIRECTORY}" \
+  -o "${GENERATED_WORLD}"
+gz sdf -k "${GENERATED_WORLD}" >/dev/null
 ros2 launch robot_bringup amr_demo.launch.py --show-args >/dev/null
 
 echo "AMR showcase demo assets passed"

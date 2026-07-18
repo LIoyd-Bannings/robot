@@ -14,6 +14,8 @@ def generate_launch_description():
     auto_demo = LaunchConfiguration("auto_demo")
     labels_enabled = LaunchConfiguration("labels_enabled")
     label_scale = LaunchConfiguration("label_scale")
+    geometry_file = LaunchConfiguration("geometry_file")
+    simulation_physics_file = LaunchConfiguration("simulation_physics_file")
     rviz_config = PathJoinSubstitution(
         [FindPackageShare("robot_simulation"), "rviz", "amr_sim.rviz"]
     )
@@ -32,6 +34,12 @@ def generate_launch_description():
     map_file = PathJoinSubstitution(
         [FindPackageShare("robot_navigation"), "maps", "indoor_room.yaml"]
     )
+    default_geometry_file = PathJoinSubstitution(
+        [FindPackageShare("robot_description"), "config", "robot_geometry.yaml"]
+    )
+    default_simulation_physics_file = PathJoinSubstitution(
+        [FindPackageShare("robot_simulation"), "config", "simulation_physics.yaml"]
+    )
 
     return LaunchDescription(
         [
@@ -44,12 +52,18 @@ def generate_launch_description():
             # 需要纯 Gazebo 演示无 RViz 时，可显式传 labels_enabled:=true。
             DeclareLaunchArgument("labels_enabled", default_value="false"),
             DeclareLaunchArgument("label_scale", default_value="0.55"),
+            DeclareLaunchArgument("geometry_file", default_value=default_geometry_file),
+            DeclareLaunchArgument(
+                "simulation_physics_file", default_value=default_simulation_physics_file
+            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(sim_launch),
                 launch_arguments={
                     "gui": gui,
                     "labels_enabled": labels_enabled,
                     "label_scale": label_scale,
+                    "geometry_file": geometry_file,
+                    "simulation_physics_file": simulation_physics_file,
                 }.items(),
             ),
             IncludeLaunchDescription(
