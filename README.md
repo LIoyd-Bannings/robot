@@ -196,7 +196,7 @@ source install/setup.bash
 vncserver -kill :1        # 关闭桌面
 ```
 
-## 一键自动仿真（推荐先跑这个）
+## 一键自动仿真
 
 `amr_demo.launch.py` 是完整的一键自动演示入口：拉起 Gazebo 室内仓储世界、机器人模型、Nav2 序列导航、RViz 可视化，并启动**自动演示编排器**（`amr_sim_demo_director_node`）自动下发一连串任务——巡航、站点搬运、过门 / 电梯、对桩充电、避障停车与恢复，全程无需人工干预。
 
@@ -383,33 +383,6 @@ ROS → 底盘:  CMD <linear_x_mps> <angular_z_radps>
 
 运动学当前支持 `diff_drive` 与 `mecanum`；`ackermann` / `four_ws4wd` 等在实现真实转向模型前降级为 `diff_drive`。
 
-## 按岗位分模块学习
-
-本项目覆盖了机器人公司大部分软件岗位的核心技能，可以按目标岗位挑对应模块针对性学习。下表把模块映射到岗位、核心技术点和建议的代码入口。
-
-| 目标岗位 | 主学模块 | 核心技术点 | 代码入口 |
-| --- | --- | --- | --- |
-| **机器人软件工程师（综合）** | `robot_bringup` + 全栈通读 | ROS2 节点/话题/服务/动作、launch 编排、包间协作 | `src/robot_bringup/launch/`、`src/robot_interfaces*/` |
-| **导航 / 运动规划工程师** | `robot_navigation` | Nav2（planner/controller/BT）、costmap、语义区 keepout/speed filter、地图管理 | `src/robot_navigation/`（`map_manager_node`、`zone_filter_masks`、`config/`） |
-| **SLAM / 定位工程师** | `robot_navigation` + `robot_sensors` | slam_toolbox、Cartographer、EKF（robot_localization）、TF 树、传感器标定 | `robot_navigation/launch/slam.launch.py`、`robot_hardware/launch/hardware_ekf.launch.py` |
-| **运动控制工程师** | `robot_path_tracking` + `robot_hardware` | Pure Pursuit / Stanley、差速/麦轮运动学、ros2_control、`diff_drive_controller` | `robot_path_tracking/src/`、`robot_hardware/src/chassis_kinematics.cpp` |
-| **嵌入式 / 底盘驱动工程师** | `robot_hardware` | 串口/UDP 通信、自定义协议编解码、`hardware_interface` 插件、里程计积分 | `robot_hardware/src/`（`chassis_packet`、`serial/udp_backend`、`chassis_hardware_interface`） |
-| **感知 / 传感器工程师** | `robot_sensors` | LaserScan/IMU 标准化、滤波、坐标系统一、diagnostics | `src/robot_sensors/src/` |
-| **任务调度 / 系统工程师** | `robot_tasks` | 任务队列/优先级/抢占、状态机、behavior tree、失败恢复、成本估算 | `robot_tasks/src/`（`mission_runner_node`、`*_workflow`、`*_behavior_tree`） |
-| **AMR 车队 / Fleet 工程师** | `robot_tasks` + `robot_interfaces_*` | 多机调度、站点路网、设施联动（门/电梯/充电）、VDA 5050、订单路由 | `robot_tasks/src/`（`fleet_*`、`facility_*`、`station_*`、`submit_order_router`） |
-| **功能安全工程师** | `robot_teleop` + `robot_utils` | cmd_vel 仲裁、急停、watchdog、限速、诊断聚合、故障监督闭环 | `robot_teleop/src/`、`robot_utils/src/`（`system_monitor`、`fault_supervisor`） |
-| **仿真 / 工具链工程师** | `robot_simulation` + `robot_description` | Gazebo 世界搭建、ros_gz bridge、URDF/Xacro、RViz 可视化、自动演示编排 | `robot_simulation/`（`worlds/`、`amr_sim_*_node`）、`robot_description/urdf/` |
-| **后端 / 上位机 / 集成工程师** | `scripts/` + `tools/` | REST gateway、VDA 5050 桥接、MQTT、webhook 回调、运营控制台 | `scripts/rest_api_gateway.py`、`scripts/vda5050_*`、`tools/operator_console.html` |
-| **测试 / DevOps 工程师** | `scripts/` + 各包 `test/` | GoogleTest、launch_testing、headless 验收、CI、Docker | `scripts/check_robot.sh`、各包 `test/`、`.github/`、`docker/` |
-
-### 建议学习路径
-
-- **零基础入门**：先 `robot_bringup` 跑通[一键自动仿真](#一键自动仿真推荐先跑这个) → 读 `robot_description`（机器人长什么样）→ `robot_sensors`（数据从哪来）→ `robot_path_tracking`（最直观的控制闭环）。
-- **算法方向**：`robot_navigation`（导航/SLAM）+ `robot_path_tracking`（控制），配合 `robot_experiments` 做对比 benchmark。
-- **工程 / 平台方向**：`robot_tasks`（调度中枢，项目最有分量的部分）+ `robot_interfaces_*`（接口设计）+ `scripts/`（北向接口与验收）。
-- **底层 / 硬件方向**：`robot_hardware`（协议与 ros2_control）+ `robot_teleop` + `robot_utils`（安全与诊断）。
-
-> 每个模块都能独立编译运行（`colcon build --packages-select <包名>`），可以单点深入而不必通读全项目。
 
 ## 许可与说明
 
